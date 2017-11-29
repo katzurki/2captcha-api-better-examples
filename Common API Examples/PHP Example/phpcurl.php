@@ -1,124 +1,136 @@
 <?php
-/*
-$filename - File name and local path. URL is not supported.
-$apikey   - Your API key
-$rtimeout - timeout of answer check
-$mtimeout - max waiting time of answer
 
-$is_verbose - false(commenting OFF),  true(commenting ON)
+  /* 2Captcha API sample implementation for PHP:cURiL
+  *   
+  *  Please note that 2Captcha does not support remote captcha image retrieval
+  *  as in some cases it can invalidate the previously issued challenge/
+  *  You need to save the challenge and pass it to the API's endpoint
+  *  without modifications.
+  *
+  *  Main arguments:
+  *
+  *  (string) $filename     -  Local path to the image that you received and will be sending on
+  *  (string) $apikey       -  Your API key 
+  *     (int) $rtimeout     -  Time in seconds to wait before polling 2Captcha's servers again
+  *     (int) $mtimeout     -  Time in seconds to wait before giving up all hope
+  *    (bool) $is_verbose   -  TRUE for increased verbosity/logging, FALSE for silent (default)
+  *
+  *    Additional captcha-related arguments:
+  *
+  *     (bool) $is_phrase    -  TRUE if the captcha image contains two words or more;
+  *                             FALSE if one word or numbers only
+  *
+  *     (bool) $is_regsense  -  TRUE if the captcha is case-sensitive
+  *                             FALSE if not
+  *      (int) $is_numeric   -  0 (default) setting not applicable
+  *                             1 - captcha contains numbers only
+  *                             2 - captcha contains letters only
+  *                             3 - captcha may be alphanumeric
+  *
+  *      (int) $min_len      -  if unset or 0 (default), argument not applicable; otherwise sets minimum answer length
+  *      (int) $max_len      -  if unset or 0 (default), argument not applicable; otherwise sets maximum answer length
+  *      (int) $language     -  if unset or 0, parameter not applicable (default)
+  *                             1 - answer may contain non-ASCII entities (Cyrillic)
+  *                             2 - answer not expected to contain non-ASCII entities (alphanumeric)  
+  * 
+  *  Usage examples:
+  *
+  *     $text = recognize("captcha.jpg", $apikey);
+  *
+  *     $text = recognize("/path/to/file/captcha.jpg", $apikey, TRUE);
+  *  
+  *     $text = recognize("/path/to/file/captcha.jpg", $apikey, FALSE, 1, 10, 0, 5);
+  *  
+  */
 
-Additional captcha settings:
-$is_phrase - 0 OR 1 - captcha contains two or more words
-$is_regsense - 0 OR 1 - case sensitive captcha
-$is_numeric -  0 OR 1 OR 2 OR 3
-0 = parameter is not used (default value)
-1 = captcha contains numbers only
-2 = captcha contains letters only
-3 = captcha contains numbers only or letters only
-$min_len    -  0 - unlimited, otherwise sets the max length of the answer
-$max_len    -  0 - unlimited, otherwise sets the min length of the answer
-$language 	- 0 OR 1 OR 2 
-0 = parameter is not used (default value)
-1 = cyrillic captcha
-2 = latin captcha
 
-usage examples:
-$text=recognize("captcha.jpg","YOUR_KEY_HERE",true, "2captcha.com");
-
-$text=recognize("/path/to/file/captcha.jpg","YOUR_KEY_HERE",false, "2captcha.com");  
-
-$text=recognize("/path/to/file/captcha.jpg","YOUR_KEY_HERE",false, "2captcha.com",1,0,0,5);  
-
-*/
-
-
-
-function recognize(
-            $filename,
-            $apikey,
-            $is_verbose = true,
-            $domain="2captcha.com",
-            $rtimeout = 5,
-            $mtimeout = 120,
-            $is_phrase = 0,
-            $is_regsense = 0,
-            $is_numeric = 0,
-            $min_len = 0,
-            $max_len = 0,
-            $language = 0
-            )
-{
-	if (!file_exists($filename))
-	{
-		if ($is_verbose) echo "file $filename not found\n";
-		return false;
-	}
-    $postdata = array(
-        'method'    => 'post', 
-        'key'       => $apikey, 
-        'file'      => new CurlFile($filename, mime_content_type($filename), 'file'),
-        'phrase'	=> $is_phrase,
-        'regsense'	=> $is_regsense,
-        'numeric'	=> $is_numeric,
-        'min_len'	=> $min_len,
-        'max_len'	=> $max_len,
-		'language'	=> $language
-        
-    );
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL,             "http://$domain/in.php");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER,     1);
-    curl_setopt($ch, CURLOPT_TIMEOUT,             60);
-    curl_setopt($ch, CURLOPT_POST,                 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS,         $postdata);
-    $result = curl_exec($ch);
-    if (curl_errno($ch)) 
+  function recognize($filename, $apikey, $is_verbose = FALSE, $rtimeout = 5, $mtimeout = 120, $is_phrase = 0, $is_regsense = 1, $is_numeric = 0, $min_len = 0, $max_len = 0, $language = 0)
     {
-    	if ($is_verbose) echo "CURL returned error: ".curl_error($ch)."\n";
-        return false;
-    }
-    curl_close($ch);
-    if (strpos($result, "ERROR")!==false)
-    {
-    	if ($is_verbose) echo "server returned error: $result\n";
-        return false;
-    }
-    else
-    {
-        $ex = explode("|", $result);
-        $captcha_id = $ex[1];
-    	if ($is_verbose) echo "captcha sent, got captcha ID $captcha_id\n";
-        $waittime = 0;
-        if ($is_verbose) echo "waiting for $rtimeout seconds\n";
-        sleep($rtimeout);
-        while(true)
+
+
+    /* This seems to be the most universally accepted method for determinining whether we have a legit image */
+
+     if(@is_array(getimagesize($filename))){
+        $is_valid_image = TRUE;
+           } else {
+        if($is_verbose) 
+           echo "File $filename not found or not an image\n";
+        return($is_valid_image = FALSE);
+     }
+
+      $postdata = array(
+          'method' => 'POST',
+          'key' => $apikey,
+          'file' => new CurlFile($filename, mime_content_type($filename), 'file'),
+          'phrase' => $is_phrase,
+          'regsense' => $is_regsense,
+          'numeric' => $is_numeric,
+          'min_len' => $min_len,
+          'max_len' => $max_len,
+          'language' => $language
+      );
+      $ch            = curl_init();
+      curl_setopt($ch, CURLOPT_URL, "http://2captcha.com/in.php");
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+      curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+      curl_setopt($ch, CURLOPT_POST, 1);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, $postdata);
+      $result        = curl_exec($ch);
+      if (curl_errno($ch))
         {
-            $result = file_get_contents("http://$domain/res.php?key=".$apikey.'&action=get&id='.$captcha_id);
-            if (strpos($result, 'ERROR')!==false)
-            {
-            	if ($is_verbose) echo "server returned error: $result\n";
-                return false;
-            }
-            if ($result=="CAPCHA_NOT_READY")
-            {
-            	if ($is_verbose) echo "captcha is not ready yet\n";
-            	$waittime += $rtimeout;
-            	if ($waittime>$mtimeout) 
-            	{
-            		if ($is_verbose) echo "timelimit ($mtimeout) hit\n";
-            		break;
-            	}
-        		if ($is_verbose) echo "waiting for $rtimeout seconds\n";
-            	sleep($rtimeout);
-            }
-            else
-            {
-            	$ex = explode('|', $result);
-            	if (trim($ex[0])=='OK') return trim($ex[1]);
-            }
+          if ($is_verbose)
+              echo "CURL returned error: " . curl_error($ch) . "\n";
+          return FALSE;
         }
-        
-        return false;
+      curl_close($ch);
+      if (strpos($result, "ERROR") !== FALSE)
+        {
+          if ($is_verbose)
+              echo "Server returned error: $result\n";
+          return FALSE;
+        }
+      else
+        {
+          $ex         = explode("|", $result);
+          $captcha_id = $ex[1];
+          if ($is_verbose)
+              echo "Captcha sent, got captcha ID $captcha_id\n";
+          $waittime = 0;
+          if ($is_verbose)
+              echo "Waiting for $rtimeout seconds and trying again\n";
+          sleep($rtimeout);
+          while (TRUE)
+            {
+              $result = file_get_contents("http://2captcha.com/res.php?key=" . $apikey . '&action=get&id=' . $captcha_id);
+              if (strpos($result, 'ERROR') !== FALSE)
+                {
+                  if ($is_verbose)
+                      echo "Server returned error: $result\n";
+                  return FALSE;
+                }
+              if ($result == "CAPCHA_NOT_READY")
+                {
+                  if ($is_verbose)
+                      echo "Captcha not yet ready\n";
+                  $waittime += $rtimeout;
+                  if ($waittime > $mtimeout)
+                    {
+                      if ($is_verbose)
+                          echo "Out of time: $mtimeout seconds reached\n";
+                      break;
+                    }
+                  if ($is_verbose)
+                      echo "Waiting for another $rtimeout seconds...\n";
+                  sleep($rtimeout);
+                }
+              else
+                {
+                  $ex = explode('|', $result);
+                  if (trim($ex[0]) == 'OK')
+                      return trim($ex[1]);
+                }
+            }
+          return FALSE;
+        }
     }
-}
-?> 
+?>
