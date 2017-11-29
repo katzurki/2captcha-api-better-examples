@@ -1,11 +1,10 @@
 <?php
 
-  /* 2Captcha API sample implementation for PHP:cURiL
+  /* 2Captcha API sample implementation for PHP:cURL
   *   
   *  Please note that 2Captcha does not support remote captcha image retrieval
-  *  as in some cases it can invalidate the previously issued challenge/
-  *  You need to save the challenge and pass it to the API's endpoint
-  *  without modifications.
+  *  as in some cases it can invalidate the previously issued captcha/
+  *  You need to save the image that the captcha server sent to your client and pass it on without modifications.
   *
   *  Main arguments:
   *
