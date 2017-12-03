@@ -45,7 +45,7 @@ function vardump(value, depth, key)
 end
 
 
-timeout = 10 --bare minimum is 5
+timeout = 20 --bare minimum is 5
 apiKey = 'dcd55077d6c883bb28cf79451b8689a1' --your apiKey 
 apiUrl = 'https://2captcha.com/in.php'
 apiResUrl = 'https://2captcha.com/res.php'
@@ -62,24 +62,27 @@ response_result, response_code, response_headers, response_status = http.request
         source = ltn12.source.string(request_body),
 	sink = ltn12.sink.table(response_body)
 }
-if time_requested == nil then 
-  time_requested = os.time();
-
-_, _, current_status = response_body.1:find('(%w+)')
-
-
-elseif os.time()-time_requested>timeout then 
-  return("Time out and die.")
-else 
-  newurl=apiResUrl .. '?key=' .. apiKey .. '&action=get&id=' .. captcha_id
-  print(newurl)
+status, captcha_id = response_body[1]:match("([^|]+)\|([^|]+)")
+if status == nil then 
+status = response_body[1] 
+return status
 end
-  response_result, response_code, response_headers, response_status = http.request(apiResUrl .. '?key=' .. apiKey .. '&action=get&id=' .. captcha_id )
+local newurl=apiResUrl .. '?key=' .. apiKey .. '&action=get&id=' .. captcha_id
 
-vardump(response_result)
-vardump(response_code)
-vardump(response_headers)
-vardump(response_body)
+function wait(waitTime)
+    timer = os.time()
+    repeat until os.time() > timer + waitTime
+end
 
-    
-  
+wtime = 5
+wait(wtime)
+
+while wtime <= timeout do 
+response_result, response_code, response_headers, response_status = http.request(apiResUrl .. '?key=' .. apiKey .. '&action=get&id=' .. captcha_id )
+status, captchaResult = response_result:match("([^|]+)\|([^|]+)")
+if (captchaResult) then return captchaResult end
+wait(1)
+wtime = wtime + 1
+end
+return 0
+
